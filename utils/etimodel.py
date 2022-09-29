@@ -90,10 +90,10 @@ class ETIModel(ETIAssumptionModel):
         return x_
 
 class GeneralizedETIModel:
-    def __init__(self, _4dm_records: pd.DataFrame, beatmap_categories: list, lasso_alpha=1):
+    def __init__(self, _4dm_records: pd.DataFrame, beatmap_categories: list, imputing_technique='min', lasso_alpha=1):
         self.beatmap_categories = beatmap_categories
-        self.main_eti_models = {cat: ETIModel() for cat in beatmap_categories}
-        self.tournament_eti_models = {cat: ETIModel() for cat in beatmap_categories}
+        self.main_eti_models = {cat: ETIModel(imputing_technique) for cat in beatmap_categories}
+        self.tournament_eti_models = {cat: ETIModel(imputing_technique) for cat in beatmap_categories}
         self._4dm_records = _4dm_records
         self._linearETIRegression = Lasso(lasso_alpha)
         self.fit_4dm()
