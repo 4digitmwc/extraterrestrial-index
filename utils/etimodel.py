@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from sklearn.linear_model import Lasso, LogisticRegression
+from sklearn.linear_model import Ridge, LogisticRegression
 
 class ETIAssumptionModel:
     """this model was built under the assumption that 
@@ -72,7 +72,7 @@ class ETIModel(ETIAssumptionModel):
     
     def _transform(self, X: np.ndarray):
         y = np.mean(X, axis=1) * np.sqrt(X.shape[-1])
-        y = np.exp(y)
+        # y = np.exp(y)
         return y
 
     def fit(self, X: np.ndarray):
@@ -90,18 +90,18 @@ class ETIModel(ETIAssumptionModel):
         return x_
 
 class GeneralizedETIModel:
-    def __init__(self, _4dm_records: pd.DataFrame, beatmap_categories: list, imputing_technique='min', lasso_alpha=1):
+    def __init__(self, _4dm_records: pd.DataFrame, beatmap_categories: list, imputing_technique='min', ridge_alpha=1):
         self.beatmap_categories = beatmap_categories
         self.main_eti_models = {cat: ETIModel(imputing_technique) for cat in beatmap_categories}
         self.tournament_eti_models = {cat: ETIModel(imputing_technique) for cat in beatmap_categories}
         self._4dm_records = _4dm_records
-        self._linearETIRegression = Lasso(lasso_alpha)
+        self._linearETIRegression = Ridge(ridge_alpha)
         self.fit_4dm()
 
     @staticmethod
     def filter_pivot(records: pd.DataFrame, category: str):
         filtered_records = records[records['beatmap_type'] == category]
-        filtered_records['beatmap'] = records.apply(lambda x: x['round'] + "_" + x['beatmap_type'] + "_" + x['beatmap_tag'], axis=1)
+        filtered_records['beatmap'] = filtered_records.apply(lambda x: x['round'] + "_" + x['beatmap_type'] + "_" + str(x['beatmap_tag']), axis=1)
         return filtered_records.pivot('player_name', 'beatmap', 'score_logit')
     
     def fit_eti(self, tournament_records: pd.DataFrame):
@@ -120,7 +120,8 @@ class GeneralizedETIModel:
             table = self.filter_pivot(tournament_records, category)
             etis = self.tournament_eti_models[category].transform(table.values)
             eti_cats[category] = pd.DataFrame(etis, index=table.index)
-            eti_cats[category].fillna(np.nanmin(etis))
+        for category in self.beatmap_categories:
+            eti_cats[category] = eti_cats[category].fillna(np.nanmin(eti_cats[category]))
         return eti_cats
     
     def _4dm_eti(self):
@@ -129,7 +130,8 @@ class GeneralizedETIModel:
             table = self.filter_pivot(self._4dm_records, category)
             etis = self.main_eti_models[category].transform(table.values)
             eti_cats[category] = pd.DataFrame(etis, index=table.index)
-            eti_cats[category].fillna(np.nanmin(etis))
+        for category in self.beatmap_categories:
+            eti_cats[category] = eti_cats[category].fillna(np.nanmin(eti_cats[category]))
         return eti_cats
     
     
@@ -147,7 +149,7 @@ class GeneralizedETIModel:
         avg_eti = _4dm_eti_result.apply(lambda x: np.mean(x), axis=1)
         
         # Get all list of 4dm players who participated in that tournament
-        list_players = list(set(avg_eti.index).union(eti_cats_tournament.index))
+        list_players = list(set(avg_eti.index).intersection(eti_cats_tournament.index))
 
         try:
             assert len(list_players) > 5
@@ -163,4 +165,4 @@ class GeneralizedETIModel:
     
     def predict(self, players_records: pd.DataFrame):
         eti_cats_players = self.transform_eti(players_records)
-        return self._linearETIRegression.predict(eti_cats_players.values)
+        return pd.DataFrame(self._linearETIRegression.predict(eti_cats_players.values), index=eti_cats_players.index)
