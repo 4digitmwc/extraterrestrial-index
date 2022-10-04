@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from sklearn.linear_model import Ridge, LogisticRegression
+from sklearn.linear_model import Ridge, LogisticRegression, ElasticNet
 
 class ETIAssumptionModel:
     """this model was built under the assumption that 
@@ -90,12 +90,12 @@ class ETIModel(ETIAssumptionModel):
         return x_
 
 class GeneralizedETIModel:
-    def __init__(self, _4dm_records: pd.DataFrame, beatmap_categories: list, imputing_technique='min', ridge_alpha=1):
+    def __init__(self, _4dm_records: pd.DataFrame, beatmap_categories: list, imputing_technique='min', l1_alpha=0.5, l2_alpha=0.5):
         self.beatmap_categories = beatmap_categories
         self.main_eti_models = {cat: ETIModel(imputing_technique) for cat in beatmap_categories}
         self.tournament_eti_models = {cat: ETIModel(imputing_technique) for cat in beatmap_categories}
         self._4dm_records = _4dm_records
-        self._linearETIRegression = Ridge(ridge_alpha)
+        self._linearETIRegression = ElasticNet(l1_alpha + l2_alpha, l1_ratio=(l1_alpha / (l1_alpha + l2_alpha)))
         self.fit_4dm()
 
     @staticmethod
