@@ -1,3 +1,4 @@
 journals/*
 dataset/*
 */__pycache__/*
+*.csv
